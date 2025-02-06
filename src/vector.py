@@ -45,7 +45,7 @@ def main():
 
     pc = Pinecone(api_key=pinecone_api_key)
 
-    index_name = "resume"
+    index_name = "personal"
 
     try:
         pc.delete_index(index_name)
