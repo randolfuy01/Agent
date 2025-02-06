@@ -4,24 +4,25 @@ import logging
 import os
 import time
 
+
 class Chat_Agent:
     """
-        Integration agent using vector embeddings and LLM
+    Integration agent using vector embeddings and LLM
     """
 
-    def __init__(self, index_name= "personal"):
-        
+    def __init__(self, index_name="personal"):
+
         # Logger for error handling
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
-        
+
         self.pinecone = None
         self.agent = None
         self.index_name = index_name
-        
+
     def instantiate_rag(self) -> None:
         """
-            Instantiating pinecone connection for random augmented retrieval
+        Instantiating pinecone connection for random augmented retrieval
         """
         local = load_dotenv()
         if not local:
@@ -31,7 +32,7 @@ class Chat_Agent:
             local = load_dotenv()
         except Exception as e:
             self.logger.error("Unable to locate local environment")
-        
+
         try:
             api_key = os.getenv("PINECONE_API")
             if not api_key:
@@ -39,8 +40,10 @@ class Chat_Agent:
                 return
             self.pinecone = Pinecone(api_key=api_key)
         except Exception as e:
-            self.logger.error(f"Unable to instantiate pinecone connection using api key: {e}")
-    
+            self.logger.error(
+                f"Unable to instantiate pinecone connection using api key: {e}"
+            )
+
     def query_vector(self, query: str, namespace: str):
         try:
             indexes = self.pinecone.list_indexes()
@@ -51,9 +54,9 @@ class Chat_Agent:
                 return
         except Exception as e:
             self.logger.error(f"Error checking index existence: {e}")
-        
+
         index = self.pinecone.Index(self.index_name)
-        
+
         # Create embedding
         try:
             self.logger.info(f"Attempting to create embedding for query")
@@ -65,13 +68,13 @@ class Chat_Agent:
         except Exception as e:
             self.logger.error(f"Unable to create embedding for query: {e}")
             return
-        
+
         # Query
         try:
             self.logger.info(f"Querying using vector embeddings")
             results = index.query(
-                namespace="ns1",  
-                vector=embedding[0].values, 
+                namespace="ns1",
+                vector=embedding[0].values,
                 top_k=1,
                 include_values=False,
                 include_metadata=True,

@@ -22,15 +22,16 @@ def parse_pdf(path_name):
         reader = pypdf.PdfReader(path_name)
     except:
         logger.error(f"Source does not exist/ error parsing pdf")
-        
+
     pdf_data = ""
     for i in range(0, len(reader.pages)):
         pdf_data += reader.pages[i].extract_text()
     pdf_data = pdf_data.strip()
-    
-    pdf_data = pdf_data.replace('\t', ' ')
-    pdf_data = ' '.join([line.strip() for line in pdf_data.split('\n')])
+
+    pdf_data = pdf_data.replace("\t", " ")
+    pdf_data = " ".join([line.strip() for line in pdf_data.split("\n")])
     return pdf_data
+
 
 def main():
     local = load_dotenv()
@@ -85,14 +86,14 @@ def main():
     for source in sources:
         try:
             result = parse_pdf(source)
-            result = result.strip('\n')
+            result = result.strip("\n")
             current_id = f"vec{counter}"
             data.append({"id": current_id, "text": result})
             counter += 1
         except Exception as e:
             logger.error(f"Error parsing source {source}: {e}")
             return
-        
+
     # Generate embeddings
     try:
         embeddings = pc.inference.embed(
@@ -116,7 +117,7 @@ def main():
     # Insert data into the index
     index = pc.Index(index_name)
     vectors = []
-    
+
     for d, e in zip(data, embeddings):
         vectors.append(
             {
@@ -136,7 +137,11 @@ def main():
         return
 
     # Query the index
-    queries = ["Randolf Gabrielle Uy", "What are some hobbies of Gabe", "Internship experience?"]
+    queries = [
+        "Randolf Gabrielle Uy",
+        "What are some hobbies of Gabe",
+        "Internship experience?",
+    ]
     for query in queries:
         try:
             embedding = pc.inference.embed(
@@ -145,8 +150,8 @@ def main():
                 parameters={"input_type": "query"},
             )
             results = index.query(
-                namespace="ns1",  
-                vector=embedding[0].values, 
+                namespace="ns1",
+                vector=embedding[0].values,
                 top_k=1,
                 include_values=False,
                 include_metadata=True,
@@ -154,6 +159,7 @@ def main():
             print(results)
         except Exception as e:
             logger.error(f"Error querying the index: {e}")
+
 
 if __name__ == "__main__":
     main()
