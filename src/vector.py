@@ -156,7 +156,7 @@ def main():
                 include_values=False,
                 include_metadata=True,
             )
-            print(results)
+            print(results["matches"][0]["metadata"]["text"])
         except Exception as e:
             logger.error(f"Error querying the index: {e}")
 
