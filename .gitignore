@@ -1,2 +1,5 @@
 *.pdf
+*.cpython-312.pyc
+
 .env
+__pycache__

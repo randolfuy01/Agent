@@ -131,7 +131,7 @@ def main():
     try:
         response = index.upsert(vectors=vectors, namespace="ns1")
         logger.info(f"Upsert response: {response}")
-        time.sleep(15)
+        time.sleep(10)
     except Exception as e:
         logger.error(f"Error upserting data: {e}")
         return
