@@ -64,9 +64,7 @@ class Chat_Agent:
         Loads the specified Pinecone index from environment configuration
         """
         try:
-            # Default to the index name provided in the class
             index_name = self.index_name
-            # Optionally, allow the user to provide a host, but default to Pinecone’s built-in discovery
             pinecone_host = os.getenv("PINECONE_HOST", None)
 
             if not pinecone_host:
@@ -86,14 +84,20 @@ class Chat_Agent:
             return None
         
     def query_vector(self, query: str):
-        
+        """Performing query to retrieve from vector database based on similarity
+
+        Args:
+            query (str): The sentence / text to perform vectorized comparison for 
+
+        Returns:
+            _type_: Response from pinecone contianing the document context
+        """
         index = self.load_index()
         
         time.sleep(10)
 
         # Create embedding
         try:
-            self.logger.info("Attempting to create embedding for query")
             embedding = self.pinecone.inference.embed(
                 model="multilingual-e5-large",
                 inputs=[query],
@@ -105,7 +109,6 @@ class Chat_Agent:
 
         # Query
         try:
-            self.logger.info("Querying using vector embeddings")
             results = index.query(
                 namespace="ns1",
                 vector=embedding[0].values,
@@ -119,18 +122,28 @@ class Chat_Agent:
         return results
 
     def response(self, query: str):
+        """ Perform end to end RAG application by finding document tied to data and 
+            contextualizating with LLM
+        Args:
+            query (str): The sentence / text to perform vectorized comparison for 
+
+        Returns:
+            _type_: Response from LLM based on the query and RAG results
+        """
+        
         rag_result = self.query_vector(query=query)
         context = rag_result["matches"][0]["metadata"]["text"]
 
         prompt = f"""You are an AI assistant that helps people learn about Randolf Uy who is a recent graduate.
             Here is what you know about him:
             {context}
-            Now, answer the user's question in a friendly and conversational way.
+            Now, answer the user's question in a friendly and conversational way. Limit the response to something casual, around 1 -2 sentences.
             User: {query}
             Chatbot:"""
 
         response = self.open_ai_agent.chat.completions.create(
-            model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}]
+            model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], stream=False
         )
 
-        return response["choices"][0]["message"]["content"]
+        return response
+    
