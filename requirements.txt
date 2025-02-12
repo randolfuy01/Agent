@@ -1,5 +1,7 @@
-openai
+# Dependencies
+fastapi
+uvicorn
+aioredis 
 pinecone-client
 python-dotenv
-logging
-os
+openai

@@ -1,0 +1,26 @@
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Testing
+__tests__/
+test.py
+pytest_cache/
+
+# Documentation
+*.md
+LICENSE
+
+# Other
+*.log
+.DS_Store

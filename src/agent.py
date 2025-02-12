@@ -4,8 +4,6 @@ import openai
 import logging
 import os
 import time
-import datetime
-import json
 
 class Chat_Agent:
     """
@@ -21,8 +19,7 @@ class Chat_Agent:
         self.pinecone = None
         self.open_ai_agent = None
         self.index_name = index_name
-        self.conversational_data = []
-        
+
     async def instantiate_api(self) -> None:
         """
         Instantiating pinecone connection for random augmented retrieval
@@ -31,7 +28,7 @@ class Chat_Agent:
         if not local:
             self.logger.info("Unable to load env variables")
             return
-        
+
         try:
             local = load_dotenv()
         except Exception as e:
@@ -74,29 +71,26 @@ class Chat_Agent:
                 return
 
             # Instantiate the Pinecone index
-            index = self.pinecone.Index(
-                name=index_name,
-                host=pinecone_host
-            )
-            
+            index = self.pinecone.Index(name=index_name, host=pinecone_host)
+
             self.logger.info(f"Loaded Pinecone index: {index_name} successfully.")
             return index
-        
+
         except Exception as e:
             self.logger.error(f"Failed to load index: {e}")
             return None
-        
+
     async def query_vector(self, query: str):
         """Performing query to retrieve from vector database based on similarity
 
         Args:
-            query (str): The sentence / text to perform vectorized comparison for 
+            query (str): The sentence / text to perform vectorized comparison for
 
         Returns:
             _type_: Response from pinecone contianing the document context
         """
         index = self.load_index()
-        
+
         time.sleep(10)
 
         # Create embedding
@@ -125,48 +119,30 @@ class Chat_Agent:
         return results
 
     async def response(self, query: str) -> str:
-        """ Perform end to end RAG application by finding document tied to data and 
+        """Perform end to end RAG application by finding document tied to data and
             contextualizating with LLM
         Args:
-            query (str): The sentence / text to perform vectorized comparison for 
+            query (str): The sentence / text to perform vectorized comparison for
 
         Returns:
             _type_: Response from LLM based on the query and RAG results
         """
-        
-        question_time = datetime.datetime.now()
-        
+
         rag_result = await self.query_vector(query=query)
         context = rag_result["matches"][0]["metadata"]["text"]
 
         prompt = f"""You are an AI assistant that helps people learn about Randolf Uy who is a recent graduate, you are hosted on his website.
             Here is what you know about him:
             {context}.
-            This is the history of your conversation:
-            {self.conversational_data}
+
             Now, answer the user's question in a friendly and conversational way, be more relaxed, like talking to an old friend at a company event. Limit the response to something casual, around 1 -2 sentences.
             User: {query}
             Chatbot:"""
 
         response = self.open_ai_agent.chat.completions.create(
-            model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}], stream=False
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False,
         )
-        
-        response_time = datetime.datetime.now()
-        
-        data_user = {
-            "role": "user",
-            "timestamp": question_time,
-            "query": query,
-        }
-        
-        data_response = {
-            "role": "chatbot",
-            "timestamp": response_time,
-            "query": query
-        }
-        
-        self.conversational_data.append(data_user)
-        self.conversational_data.append(data_response)
+
         return response.choices[0].message.content
-    

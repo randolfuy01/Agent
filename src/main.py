@@ -1,46 +1,16 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
 from agent import Chat_Agent
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+import aioredis
+import asyncio
 
+redis = aioredis.from_url("redis://localhost", decode_responses=True)
 app = FastAPI(lifespan="lifespan")
 
-html = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Chat</title>
-    </head>
-    <body>
-        <h1>WebSocket Chat</h1>
-        <h2>Your ID: <span id="ws-id"></span></h2>
-        <form action="" onsubmit="sendMessage(event)">
-            <input type="text" id="messageText" autocomplete="off"/>
-            <button>Send</button>
-        </form>
-        <ul id='messages'>
-        </ul>
-        <script>
-            var client_id = Date.now()
-            document.querySelector("#ws-id").textContent = client_id;
-            var ws = new WebSocket(`ws://localhost:8000/ws/${client_id}`);
-            ws.onmessage = function(event) {
-                var messages = document.getElementById('messages')
-                var message = document.createElement('li')
-                var content = document.createTextNode(event.data)
-                message.appendChild(content)
-                messages.appendChild(message)
-            };
-            function sendMessage(event) {
-                var input = document.getElementById("messageText")
-                ws.send(input.value)
-                input.value = ''
-                event.preventDefault()
-            }
-        </script>
-    </body>
-</html>
-"""
+RATE_LIMIT = 5
+TIME_WINDOW = 20
+
 
 class ConnectionManager:
     def __init__(self):
@@ -66,15 +36,22 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://portfolio-randolfuy01s-projects.vercel.app/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 manager = ConnectionManager()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles setup and teardown of app lifecycle events"""
-    await manager.setup()  # Setup logic before app starts
-    yield  # Application is running
-    # Cleanup logic after app shuts down
+    await manager.setup()
+    yield
     for connection in manager.active_connections:
         await connection.close()
 
@@ -84,20 +61,62 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def get():
-    return HTMLResponse(html)
+    return "Starting web server"
+
+
+async def is_rate_limited(client_id: str) -> bool:
+    """Ensuring rate limiter using redis by waiting until expiration
+
+    Args:
+        client_id (str): Client request is coming from
+
+    Returns:
+        bool: If client is already rate limited
+    """
+    key = f"rate_limit:{client_id}"
+    count = await redis.incr(key)
+
+    if count == 1:
+        await redis.expire(key, TIME_WINDOW)
+
+    return count > RATE_LIMIT
 
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
-    await manager.connect(websocket)
+    """API for interacting with personal website, allows for agent to interact with users with specified end points
+       Ensures rate limited for spam messaging
     
+    Args:
+        websocket (WebSocket): Websocket connection
+        client_id (int): ID from which interaction is coming from
+    """
+
+    await manager.connect(websocket)
+
     try:
         while True:
+            if await is_rate_limited(str(client_id)):
+                await manager.send_personal_message(
+                    "⚠️ Rate limit exceeded. Wait before sending more messages.",
+                    websocket,
+                )
+                await asyncio.sleep(TIME_WINDOW)  # Prevent spam
+                continue  # Skip processing the current request
+
+            # Receive message from client
             data = await websocket.receive_text()
+            print(f"Client {client_id} sent: {data}")
+
+            # Echo message back
             await manager.send_personal_message(f"You wrote: {data}", websocket)
+
+            # Process response
             response = await manager.agent.response(data)
             await manager.send_personal_message(response, websocket)
-            print(f"Bot: {response}")
+
+            print(f"Agent to Client {client_id}: {response}")
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         await manager.broadcast(f"Client #{client_id} left the chat")
