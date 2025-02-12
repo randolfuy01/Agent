@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import aioredis
 import asyncio
 
-redis = aioredis.from_url("redis://localhost", decode_responses=True)
+redis = aioredis.from_url("redis://127.0.0.1", decode_responses=True)
 app = FastAPI(lifespan="lifespan")
 
 RATE_LIMIT = 5
