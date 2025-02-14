@@ -39,7 +39,7 @@ class ConnectionManager:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://portfolio-randolfuy01s-projects.vercel.app/",
+        "https://randolfuy.vercel.app/",
         "http://localhost:3000",
         "http://ec2-52-15-254-67.us-east-2.compute.amazonaws.com:8000", 
     ],
