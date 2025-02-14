@@ -30,6 +30,7 @@ echo "Starting container..."
 if docker run -d \
     --name myapp \
     -p 8000:8000 \
+    -p 6379:6379 \
     --restart unless-stopped \
     myapp; then
     echo -e "${GREEN}Container started successfully${NC}"
