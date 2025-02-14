@@ -38,11 +38,16 @@ class ConnectionManager:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://portfolio-randolfuy01s-projects.vercel.app/"],
+    allow_origins=[
+        "https://portfolio-randolfuy01s-projects.vercel.app/",
+        "http://localhost:3000",
+        "http://ec2-52-15-254-67.us-east-2.compute.amazonaws.com:8000", 
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 manager = ConnectionManager()
 
@@ -65,33 +70,24 @@ async def get():
 
 
 async def is_rate_limited(client_id: str) -> bool:
-    """Ensuring rate limiter using redis by waiting until expiration
-
-    Args:
-        client_id (str): Client request is coming from
-
-    Returns:
-        bool: If client is already rate limited
-    """
+    """Ensuring rate limiter using redis by waiting until expiration"""
     key = f"rate_limit:{client_id}"
-    count = await redis.incr(key)
+    try:
+        count = await redis.incr(key)
 
-    if count == 1:
-        await redis.expire(key, TIME_WINDOW)
+        if count == 1:
+            await redis.expire(key, TIME_WINDOW)
 
-    return count > RATE_LIMIT
+        return count > RATE_LIMIT
+    except aioredis.exceptions.ConnectionError:
+        print("Error connecting to Redis.")
+        return False
 
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: int):
     """API for interacting with personal website, allows for agent to interact with users with specified end points
-       Ensures rate limited for spam messaging
-    
-    Args:
-        websocket (WebSocket): Websocket connection
-        client_id (int): ID from which interaction is coming from
-    """
-
+       Ensures rate limited for spam messaging"""
     await manager.connect(websocket)
 
     try:
@@ -101,21 +97,20 @@ async def websocket_endpoint(websocket: WebSocket, client_id: int):
                     "⚠️ Rate limit exceeded. Wait before sending more messages.",
                     websocket,
                 )
-                await asyncio.sleep(TIME_WINDOW)  # Prevent spam
-                continue  # Skip processing the current request
+                await asyncio.sleep(TIME_WINDOW)
+                continue
 
             # Receive message from client
             data = await websocket.receive_text()
-            print(f"Client {client_id} sent: {data}")
-
-            # Echo message back
-            await manager.send_personal_message(f"You wrote: {data}", websocket)
 
             # Process response
-            response = await manager.agent.response(data)
-            await manager.send_personal_message(response, websocket)
-
-            print(f"Agent to Client {client_id}: {response}")
+            try:
+                response = await manager.agent.response(data)
+                await manager.send_personal_message(response, websocket)
+                print(f"Agent to Client {client_id}: {response}")
+            except Exception as e:
+                print(f"Error processing message from client {client_id}: {e}")
+                await manager.send_personal_message("Sorry, there was an error processing your request.", websocket)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

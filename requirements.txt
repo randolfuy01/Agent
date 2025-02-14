@@ -1,6 +1,5 @@
 # Dependencies
 fastapi
-uvicorn
 aioredis 
 pinecone-client
 python-dotenv
